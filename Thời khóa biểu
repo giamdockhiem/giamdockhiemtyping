@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thời khóa biểu</title>
+<style>
+  :root {
+    --paper: #f3f1ec;
+    --ink: #1d2740;
+    --muted: #6b7388;
+    --line: #d9d6cc;
+    --today: #fff1b8;
+    --accent: #2f4fd1;
+    font-family: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); }
+  header {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    justify-content: space-between; padding: 20px 24px 12px;
+  }
+  h1 { margin: 0; font-size: 1.6rem; font-weight: 700; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: .9rem; margin-top: 2px; }
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; }
+  button, select, input { font: inherit; color: inherit; }
+  .btn {
+    border: 1px solid var(--ink); background: transparent; border-radius: 6px;
+    padding: 8px 14px; cursor: pointer;
+  }
+  .btn:hover { background: #e7e4da; }
+  .btn.primary { background: var(--ink); color: #fff; }
+  .btn.primary:hover { background: #2b3860; }
+  .btn.danger { border-color: #b3261e; color: #b3261e; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .wrap { padding: 0 24px 32px; overflow-x: auto; }
+  .grid {
+    display: grid;
+    grid-template-columns: 96px repeat(7, minmax(130px, 1fr));
+    grid-auto-rows: 64px;
+    grid-template-rows: 44px;
+    min-width: 1000px;
+    background: #fff; border: 1px solid var(--ink); border-radius: 8px; overflow: hidden;
+  }
+  .head, .time {
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    background: #ebe8de; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    font-weight: 600; font-size: .9rem;
+  }
+  .head.today { background: var(--today); }
+  .time { font-weight: 500; font-size: .8rem; color: var(--muted); }
+  .time b { color: var(--ink); font-size: .9rem; }
+  .time.break { border-bottom: 3px double var(--ink); }
+  .slot {
+    border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    background: transparent; cursor: pointer; padding: 0;
+  }
+  .slot.today { background: #fffbe6; }
+  .slot:hover { background: #eef1ff; }
+  .slot.break { border-bottom: 3px double var(--ink); }
+
+  .class {
+    margin: 3px; padding: 8px 10px; border-radius: 6px; text-align: left; cursor: pointer;
+    border: 0; border-left: 5px solid rgba(0,0,0,.35);
+    display: flex; flex-direction: column; gap: 2px; overflow: hidden; z-index: 2;
+  }
+  .class strong { font-size: .95rem; line-height: 1.25; }
+  .class span { font-size: .8rem; opacity: .85; }
+  .class:hover { filter: brightness(.96); }
+
+  dialog {
+    border: 1px solid var(--ink); border-radius: 10px; padding: 0; width: min(440px, 92vw);
+    background: #fff; color: var(--ink);
+  }
+  dialog::backdrop { background: rgba(29,39,64,.45); }
+  form { padding: 20px; display: grid; gap: 12px; }
+  form h2 { margin: 0 0 4px; font-size: 1.15rem; }
+  label { display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
+  input, select {
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: #fff; color: var(--ink);
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .colors { display: flex; gap: 8px; }
+  .colors input { position: absolute; opacity: 0; }
+  .colors label {
+    width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; display: block;
+  }
+  .colors input:checked + label { border-color: var(--ink); box-shadow: 0 0 0 2px #fff inset; }
+  .colors input:focus-visible + label { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .error { color: #b3261e; font-size: .85rem; min-height: 1.2em; }
+  .actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .actions .danger { margin-right: auto; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Thời khóa biểu</h1>
+    <div class="sub">Bấm vào ô trống để thêm môn, bấm vào môn học để sửa hoặc xóa.</div>
+  </div>
+  <div class="tools">
+    <button class="btn primary" id="addBtn">Thêm môn học</button>
+    <button class="btn" id="exportBtn">Xuất file JSON</button>
+    <button class="btn" id="importBtn">Nhập file JSON</button>
+    <button class="btn danger" id="clearBtn">Xóa tất cả</button>
+    <input type="file" id="importFile" accept="application/json" hidden>
+  </div>
+</header>
+
+<div class="wrap"><div class="grid" id="grid"></div></div>
+
+<dialog id="dlg">
+  <form id="form">
+    <h2 id="dlgTitle">Thêm môn học</h2>
+    <label>Tên môn học
+      <input id="subject" required maxlength="40" placeholder="Ví dụ: Toán">
+    </label>
+    <div class="row">
+      <label>Giáo viên <input id="teacher" maxlength="40"></label>
+      <label>Phòng học <input id="room" maxlength="20"></label>
+    </div>
+    <div class="row">
+      <label>Thứ <select id="day"></select></label>
+      <label>Bắt đầu từ tiết <select id="start"></select></label>
+    </div>
+    <label>Số tiết
+      <input id="length" type="number" min="1" max="10" value="2" required>
+    </label>
+    <div>
+      <div style="font-size:.85rem;color:var(--muted);margin-bottom:6px">Màu</div>
+      <div class="colors" id="colors"></div>
+    </div>
+    <div class="error" id="error" role="alert"></div>
+    <div class="actions">
+      <button type="button" class="btn danger" id="deleteBtn">Xóa môn</button>
+      <button type="button" class="btn" id="cancelBtn">Hủy</button>
+      <button type="submit" class="btn primary">Lưu</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  const DAYS = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"];
+  const PERIODS = [
+    "07:00 - 07:45", "07:50 - 08:35", "08:40 - 09:25", "09:35 - 10:20", "10:25 - 11:10",
+    "13:00 - 13:45", "13:50 - 14:35", "14:40 - 15:25", "15:35 - 16:20", "16:25 - 17:10"
+  ];
+  const COLORS = ["#ffd6d6", "#ffe3b8", "#e3f2b8", "#c9f0dc", "#cfe1ff", "#e6d6ff"];
+  const KEY = "thoi-khoa-bieu-v1";
+
+  let classes = load();
+  let editingId = null;
+
+  const $ = (id) => document.getElementById(id);
+  const grid = $("grid"), dlg = $("dlg"), form = $("form");
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || sample(); }
+    catch { return sample(); }
+  }
+  function save() { localStorage.setItem(KEY, JSON.stringify(classes)); }
+  function sample() {
+    return [
+      { id: 1, subject: "Toán", teacher: "Cô Lan", room: "A101", day: 0, start: 1, length: 2, color: COLORS[4] },
+      { id: 2, subject: "Ngữ văn", teacher: "Thầy Hùng", room: "A102", day: 1, start: 3, length: 2, color: COLORS[0] },
+      { id: 3, subject: "Tiếng Anh", teacher: "Cô Mai", room: "B201", day: 2, start: 6, length: 2, color: COLORS[3] }
+    ];
+  }
+
+  // Thứ hôm nay: 0 = Thứ 2 ... 6 = Chủ nhật
+  const todayIndex = (new Date().getDay() + 6) % 7;
+
+  function render() {
+    grid.innerHTML = "";
+    grid.appendChild(cell("head", "Tiết"));
+    DAYS.forEach((d, i) => grid.appendChild(cell("head" + (i === todayIndex ? " today" : ""), d)));
+
+    PERIODS.forEach((time, p) => {
+      const row = p + 2;
+      const brk = p === 4 ? " break" : "";
+      const t = document.createElement("div");
+      t.className = "time" + brk;
+      t.style.gridArea = `${row} / 1`;
+      t.innerHTML = `<b>Tiết ${p + 1}</b><span>${time}</span>`;
+      grid.appendChild(t);
+
+      DAYS.forEach((_, d) => {
+        const s = document.createElement("button");
+        s.className = "slot" + brk + (d === todayIndex ? " today" : "");
+        s.style.gridArea = `${row} / ${d + 2}`;
+        s.setAttribute("aria-label", `Thêm môn ${DAYS[d]} tiết ${p + 1}`);
+        s.onclick = () => openDialog(null, { day: d, start: p + 1 });
+        grid.appendChild(s);
+      });
+    });
+
+    classes.forEach((c) => {
+      const b = document.createElement("button");
+      b.className = "class";
+      b.style.background = c.color;
+      b.style.gridArea = `${c.start + 1} / ${c.day + 2} / span ${c.length} / span 1`;
+      b.innerHTML = `<strong></strong><span></span><span></span>`;
+      b.children[0].textContent = c.subject;
+      b.children[1].textContent = c.room ? "Phòng " + c.room : "";
+      b.children[2].textContent = c.teacher;
+      b.onclick = () => openDialog(c);
+      grid.appendChild(b);
+    });
+  }
+
+  function cell(cls, text) {
+    const el = document.createElement("div");
+    el.className = cls;
+    el.textContent = text;
+    return el;
+  }
+
+  // Khởi tạo các ô chọn trong form
+  DAYS.forEach((d, i) => $("day").add(new Option(d, i)));
+  PERIODS.forEach((_, i) => $("start").add(new Option("Tiết " + (i + 1), i + 1)));
+  COLORS.forEach((c, i) => {
+    $("colors").insertAdjacentHTML("beforeend",
+      `<input type="radio" name="color" id="c${i}" value="${c}"><label for="c${i}" style="background:${c}" title="Màu ${i + 1}"></label>`);
+  });
+
+  function openDialog(c, preset = {}) {
+    editingId = c ? c.id : null;
+    $("dlgTitle").textContent = c ? "Sửa môn học" : "Thêm môn học";
+    $("subject").value = c ? c.subject : "";
+    $("teacher").value = c ? c.teacher : "";
+    $("room").value = c ? c.room : "";
+    $("day").value = c ? c.day : (preset.day ?? 0);
+    $("start").value = c ? c.start : (preset.start ?? 1);
+    $("length").value = c ? c.length : 2;
+    const color = c ? c.color : COLORS[classes.length % COLORS.length];
+    document.querySelector(`input[name=color][value="${color}"]`).checked = true;
+    $("deleteBtn").style.display = c ? "" : "none";
+    $("error").textContent = "";
+    dlg.showModal();
+    $("subject").focus();
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const item = {
+      id: editingId ?? Date.now(),
+      subject: $("subject").value.trim(),
+      teacher: $("teacher").value.trim(),
+      room: $("room").value.trim(),
+      day: +$("day").value,
+      start: +$("start").value,
+      length: +$("length").value,
+      color: document.querySelector("input[name=color]:checked").value
+    };
+    const end = item.start + item.length - 1;
+    if (end > PERIODS.length) {
+      $("error").textContent = `Môn học vượt quá tiết ${PERIODS.length}. Hãy giảm số tiết hoặc chọn tiết bắt đầu sớm hơn.`;
+      return;
+    }
+    const clash = classes.find((o) =>
+      o.id !== item.id && o.day === item.day &&
+      item.start <= o.start + o.length - 1 && end >= o.start);
+    if (clash) {
+      $("error").textContent = `Trùng giờ với môn "${clash.subject}" (tiết ${clash.start}–${clash.start + clash.length - 1}).`;
+      return;
+    }
+    classes = classes.filter((o) => o.id !== item.id).concat(item);
+    save(); render(); dlg.close();
+  });
+
+  $("addBtn").onclick = () => openDialog(null);
+  $("cancelBtn").onclick = () => dlg.close();
+  $("deleteBtn").onclick = () => {
+    classes = classes.filter((o) => o.id !== editingId);
+    save(); render(); dlg.close();
+  };
+  $("clearBtn").onclick = () => {
+    if (confirm("Xóa toàn bộ thời khóa biểu?")) { classes = []; save(); render(); }
+  };
+  $("exportBtn").onclick = () => {
+    const blob = new Blob([JSON.stringify(classes, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "thoi-khoa-bieu.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  $("importBtn").onclick = () => $("importFile").click();
+  $("importFile").onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (!Array.isArray(data)) throw new Error();
+      classes = data; save(); render();
+    } catch { alert("File không hợp lệ. Hãy chọn file JSON đã xuất từ ứng dụng này."); }
+    e.target.value = "";
+  };
+
+  render();
+</script>
+</body>
+</html>
